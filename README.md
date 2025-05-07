@@ -7,21 +7,21 @@
 Use the commands below to install the package. 
 
 ```
-git clone <Add Link to Package>
-cd 
-conda env create -f PublicSpeaking.yaml
-conda activate PublicSpeaking
+git clone https://github.com/MatthewHiggins2017/Converser.git
+cd Converser
+conda env create -f Converser.yaml
+conda activate Converser
 pip install . 
 
 ```
 
 ## Inputs
 
+```
+# Example Command
+Converser_Assess.py --input_file ./Path/To/Audio/File 
+```
 
-## Output
-
-
-## Run 
 
 ## Goals
 * Aim for speech rate that feels natural (120–150 WPM).

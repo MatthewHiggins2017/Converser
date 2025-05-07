@@ -268,9 +268,6 @@ def detect_filler_words(transcript, filler_words=None):
     # Calculate the total count of all filler words
     total_filler_count = sum(filler_word_counts.values())
 
-    # Delete
-    print(filler_word_counts)
-
     return filler_word_counts, total_filler_count
 
 
@@ -411,7 +408,7 @@ Duration = get_wav_length(args.output_wav)
 WhisperResults = WhisperCreateTranscript(args.output_wav, Model='large')
 Transcript = WhisperResults['text']
 
-# THE ISSUE IS COMING FROM SEGMENTS VARIATION
+# 3) Combine all segments together.
 WordTimestamps = []
 for a in WhisperResults['segments']:
     WordTimestamps += a['words']
@@ -471,8 +468,6 @@ WindowsMetricDf = pd.DataFrame(WindowMetricList)
 AllPitch = AllPitch.reset_index(drop=True)
 AllPauses = AllPauses.reset_index(drop=True)
 
-print('FUCK',WindowsMetricDf['TotalFillerCount'].sum())
-
 SummaryDict = {}
 SummaryDict['Duration'] = Duration
 SummaryDict['Word Count'] = len(Transcript.split(' '))
@@ -488,8 +483,6 @@ SummaryDict['Overall Readability'] = readability_grade(Transcript)
 
 SummaryDf = pd.DataFrame(SummaryDict, index=[ID]).T
 SummaryDf = score_metrics(SummaryDf,ID)
-
-
 
 
 TranscriptFile = open(args.input_file.replace('.m4a', '_Transcript.txt'), 'w')
