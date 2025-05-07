@@ -21,13 +21,13 @@ Full transcript metrics:
 ##############################################
 ##############################################
    
-To Do:
+Improvements:
 
-- Double check the timing system, e.g. if I slow things down or add word at specific time? 
-- Double check the pitch system / function
-- Create fixed test to hit transcripts. 
-- Add to Gitub
-- Update ReadMe
+
+1) Add in fixed tests. 
+2) Add in automatic dependency installation & checking.
+3) Check deployment
+
 
 ##############################################
 ##############################################
@@ -40,12 +40,13 @@ import parselmouth
 import pandas as pd
 import numpy as np
 import textstat
-import nltk
-nltk.download('punkt_tab', quiet=True)
 from nltk import word_tokenize
+from transformers import pipeline
+from collections import defaultdict
+import os
 
-
-
+# import nltk
+# nltk.download('punkt_tab', quiet=True)
 
 ###############################################################################
 #                              Core Functions                                 #
@@ -283,6 +284,68 @@ def readability_grade(text):
     return textstat.flesch_kincaid_grade(text)
 
 
+def analyze_sentiment_transformers(transcript):
+    """
+    Analyze sentiment using a Hugging Face transformer model.
+
+    Args:
+        transcript (str): The transcript text.
+
+    Returns:
+        dict: Sentiment label and score.
+    """
+    sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+    sentiment_result = sentiment_pipeline(transcript)
+    return sentiment_result  # Return the first result (label and score)
+
+
+def analyze_emotions(transcript):
+    """
+    Analyze emotions using a Hugging Face transformer model.
+
+    Args:
+        transcript (str): The transcript text.
+
+    Returns:
+        dict: Emotion labels and scores.
+    """
+    emotion_pipeline = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base", top_k=None)
+    emotion_result = emotion_pipeline(transcript)
+    return emotion_result
+
+
+def Zero_Shot_Analyse_Emotions(transcript):
+    # Load the BART large MNLI model
+    classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+    # Define your emotion candidate labels
+    '''
+    candidate_labels = [
+        # Positive Emotions
+        "Pride","Hope", "Enthusiasm",
+
+        # Negative Emotions
+        "Anxiety", "Frustration", "Hurt",
+
+        # Neutral or Ambiguous Emotions
+        "Skepticism","Thoughtfulness", "Uncertainty",
+
+        # Meta-labels
+        "Empathetic", "Sarcastic", "Passive-Aggressive", "Hostile", "Calm",
+        "Composed", "Assertive", "Defeated","Confident"
+    ]
+    '''
+    candidate_labels = ['confident','unsure','neutral']
+
+    # Run classification
+    result = classifier(transcript, candidate_labels, multi_label=True)
+
+    # Print results sorted by score
+    sorted_result = sorted(zip(result['labels'], result['scores']), key=lambda x: x[1], reverse=True)
+
+    return sorted_result
+
+
 
 def score_metrics(df,ID):
     
@@ -389,22 +452,26 @@ def score_metrics(df,ID):
 parser = argparse.ArgumentParser(description="Analyze public speaking audio files.")
 parser.add_argument("--input_file", type=str, help="Path to the input .m4a file.", required=True)
 parser.add_argument("--time_window", type=int, default=30, help="Time window size in seconds (default: 30).")
-
+parser.add_argument("--output_dir",type=str,help="Path to the output directory",default='./')
+parser.add_argument("--user_label",type=str,default='')
 # Parse the arguments
 args = parser.parse_args()
-
+# Extract ID
 ID = args.input_file.split('/')[-1].replace('.m4a', '')
+
+# Create output dir  if it doesnt exist
+if not os.path.isdir(args.output_dir):
+    os.makedirs(args.output_dir)
 
 
 # 1) Convert to wav file 
 args.output_wav = args.input_file.replace('.m4a', '.wav')
 convert_m4a_to_wav(args.input_file, args.output_wav)
 
-
 # 2) Get the length of the wav file
 Duration = get_wav_length(args.output_wav)
 
-# 2) Run Whisper and get the results. 
+# 2) Run Whisper and get the Transcript. 
 WhisperResults = WhisperCreateTranscript(args.output_wav, Model='large')
 Transcript = WhisperResults['text']
 
@@ -415,6 +482,9 @@ for a in WhisperResults['segments']:
 
 
 WindowMetricList = []
+EmotionScore = defaultdict(float)
+SegmentCount=0
+
 AllPitch = pd.DataFrame()
 AllPauses = pd.DataFrame()
 
@@ -429,7 +499,11 @@ while True:  # Infinite loop, explicitly break when no words are left
     # Subset the word list based on the time window
     WordsInWindow = [word for word in WordTimestamps if WindowStart <= word['start'] < WindowEnd]
 
-    if not WordsInWindow:  # Break the loop if no words are found in the current window
+    # Subset of the transcript in use
+    TempTranscript = ' '.join([x['word'] for x in WordsInWindow])
+
+     # Break the loop if no words are found in the current window
+    if not WordsInWindow: 
         break
 
     # Calculate word rate in the current time window
@@ -447,6 +521,11 @@ while True:  # Infinite loop, explicitly break when no words are left
     # Detect filler words in the current time window
     FillerWordCounts, WindowMetrics['TotalFillerCount'] = detect_filler_words(' '.join([word['word'] for word in WordsInWindow]))
 
+    # Run Emotional Analysis
+    zero_shot_emotion_analysis = Zero_Shot_Analyse_Emotions(Transcript)
+    for zse in zero_shot_emotion_analysis:
+        EmotionScore[zse[0]]+=zse[1]
+
     # Merge results
     if WindowMetrics:
         WindowMetricList.append(WindowMetrics)
@@ -456,11 +535,7 @@ while True:  # Infinite loop, explicitly break when no words are left
     # Update Window Metrics
     WindowStart = WindowEnd
     WindowEnd += args.time_window
-
-
-########################################################################################
-########################################################################################
-########################################################################################
+    SegmentCount +=1
 
 
 # Calculate Summary Metrics
@@ -468,44 +543,69 @@ WindowsMetricDf = pd.DataFrame(WindowMetricList)
 AllPitch = AllPitch.reset_index(drop=True)
 AllPauses = AllPauses.reset_index(drop=True)
 
+# Convert Emotional Score to DataFrame And Normalise by Segments
+EmotionalScoreDf = pd.DataFrame([EmotionScore])
+EmotionalScoreDf = EmotionalScoreDf.T
+EmotionalScoreDf[0] = EmotionalScoreDf[0]/SegmentCount 
+
+
 SummaryDict = {}
+SummaryDict['ID'] = ID
+SummaryDict['Date'] = pd.to_datetime('today').strftime('%Y-%m-%d')
+SummaryDict['User_Label'] = args.user_label
 SummaryDict['Duration'] = Duration
 SummaryDict['Word Count'] = len(Transcript.split(' '))
-SummaryDict['AverageWordsPerMinute'] = len(Transcript.split(' ')) / (Duration / 60)
+SummaryDict['Average_Words_Per_Minute'] = len(Transcript.split(' ')) / (Duration / 60)
 SummaryDict['Mean_Pitch'] = AllPitch['mean_pitch'].mean()
 SummaryDict['Mean_Pitch_Std'] = AllPitch['mean_pitch'].std()
 SummaryDict['Mean_Pause'] = AllPauses['gap'].mean()
 SummaryDict['Mean_Pause_Std'] = AllPauses['gap'].std()
-SummaryDict['TotalFillerCount'] = WindowsMetricDf['TotalFillerCount'].sum()
-SummaryDict['OverallLexicalDiversity'] = lexical_diversity(Transcript)
-SummaryDict['Overall Readability'] = readability_grade(Transcript)
+SummaryDict['Total_Filler_Count'] = WindowsMetricDf['TotalFillerCount'].sum()
+SummaryDict['Overall_Lexical_Diversity'] = lexical_diversity(Transcript)
+SummaryDict['Overall_Readability'] = readability_grade(Transcript)
 
+# Full Transcript Sentiment Analysis (Positive /Negative /Neutral)
+sentiment_result = analyze_sentiment_transformers(Transcript)
+SummaryDict['Sentiment_Label'] = sentiment_result[0]['label']  
+SummaryDict['Sentiment_Score'] = sentiment_result[0]['score']
 
+# Full Transcript General Emotion Analysis 
+emotion_result = analyze_emotions(Transcript)
+for e in emotion_result[0]:
+    SummaryDict[f'General_Emotion_{e["label"]}'] = e['score']
+highest_emotion = max(emotion_result[0], key=lambda x: x['score'])
+SummaryDict['Dominant_General_Emotion'] = highest_emotion['label']
+
+# Zero Shot Emotion Classification 
+SummaryDict['Dominant_Zero_Shot_Emotion'] = EmotionalScoreDf.sort_values(by=[0],ascending=False).index.tolist()[0]
+
+# Convert to DataFrame
 SummaryDf = pd.DataFrame(SummaryDict, index=[ID]).T
+
+# Score Metrics which can be scored.
 SummaryDf = score_metrics(SummaryDf,ID)
 
 
-TranscriptFile = open(args.input_file.replace('.m4a', '_Transcript.txt'), 'w')
+##########################
+#  Write Output Files    #
+##########################
+
+# Create the transcript file path
+TranscriptFile = open(os.path.join(args.output_dir, f"{ID}_Transcript.txt"), 'w')
 TranscriptFile.write(Transcript)
 TranscriptFile.close()
-SummaryDf.to_csv(args.input_file.replace('.m4a', '_Summary.csv'), index=True)
-WindowsMetricDf.to_csv(args.input_file.replace('.m4a', '_WindowMetrics.csv'), index=False)
-AllPitch.to_csv(args.input_file.replace('.m4a', '_Pitch.csv'), index=False)
-AllPauses.to_csv(args.input_file.replace('.m4a', '_Pauses.csv'), index=False)
-
-
+SummaryDf.to_csv(os.path.join(args.output_dir, f"{ID}_Summary.csv"), index=True)
+WindowsMetricDf.to_csv(os.path.join(args.output_dir, f"{ID}_WindowMetrics.csv"), index=False)
+AllPitch.to_csv(os.path.join(args.output_dir, f"{ID}_Pitch.csv"), index=False)
+AllPauses.to_csv(os.path.join(args.output_dir, f"{ID}_Pauses.csv"), index=False)
+EmotionalScoreDf.to_csv(os.path.join(args.output_dir, f"{ID}_Emotion.csv"), index=False)
 
 print('\n\n')
 print(Transcript)
 print('\n\n')
 print(SummaryDf)
 print('\n\n')
-print(WindowsMetricDf)
-print('\n\n')
-print(AllPitch)
-print('\n\n')
-print(AllPauses)
-
+print(EmotionalScoreDf)
 
 
 ###############################################################################
