@@ -2,7 +2,7 @@
 
 **Description**: Python package to assess and improve public speaking. 
 
-## Installation.
+## Installation
 
 Use the commands below to install the package. 
 
@@ -15,10 +15,9 @@ pip install .
 
 ```
 
-## Inputs
+## Example Command
 
 ```
-# Example Command
 Converser_Assess.py --input_file ./Path/To/Audio/File 
 ```
 
