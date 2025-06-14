@@ -37,6 +37,7 @@ Converser_Assess.py --input_file ./Path/To/Audio/File
 | **Lexical Diversity (TTR)**         | ≥ 0.6                                  | 0.5–0.59              | 0.4–0.49          | 0.3–0.39         | <0.3               |
 | **Readability Grade**               | 7–9 (ideal range for general audience) | 6 or 10               | 5 or 11           | 4 or 12          | ≤3 or ≥13          |
 
+
 ## Transformer-Based Models Used
 
 This package leverages several state-of-the-art transformer models to analyze speech and text data:
@@ -50,15 +51,33 @@ This package leverages several state-of-the-art transformer models to analyze sp
    - **Purpose**: Analyzes the sentiment of the transcript (e.g., positive, negative, or neutral).
    - **Model**: `distilbert-base-uncased-finetuned-sst-2-english`
    - **Description**: A lightweight version of BERT fine-tuned on the Stanford Sentiment Treebank (SST-2) dataset. It is optimized for sentiment classification tasks while being faster and more efficient than the original BERT.
+   - **Function**: Encoded by the analyze_sentiment_transformers() function.
 
 ### 3. **DistilRoBERTa for Emotion Analysis**
    - **Purpose**: Detects emotions in the transcript, such as joy, sadness, anger, etc.
    - **Model**: `j-hartmann/emotion-english-distilroberta-base`
    - **Description**: A fine-tuned version of DistilRoBERTa trained on emotion datasets like GoEmotions. It provides detailed emotion scores for nuanced analysis.
+   - **Function**: Encoded by the analyze_emotions() function.
 
 ### 4. **BART for Zero-Shot Classification**
    - **Purpose**: Performs zero-shot emotion classification, identifying emotions without requiring task-specific training.
    - **Model**: `facebook/bart-large-mnli`
    - **Description**: BART is a sequence-to-sequence model fine-tuned for natural language inference (NLI). It enables zero-shot classification by comparing input text against predefined labels, making it highly flexible for emotion detection.
+   - **Function**: Encoded by the Zero_Shot_Analyse_Emotions() function.
+
+
+## Model Summmary
+
+| Feature        | DistilBERT (Sentiment)                            | DistilRoBERTa (Emotion)                         | BART (Zero-Shot)                             |
+| -------------- | ------------------------------------------------- | ----------------------------------------------- | -------------------------------------------- |
+| Model          | `distilbert-base-uncased-finetuned-sst-2-english` | `j-hartmann/emotion-english-distilroberta-base` | `facebook/bart-large-mnli`                   |
+| Task           | Sentiment (binary)                                | Emotion (multi-label)                           | Zero-shot classification                     |
+| Training Data  | SST-2                                             | GoEmotions (and similar)                        | MNLI (entailment)                            |
+| Flexibility    | Low                                               | Medium                                          | High                                         |
+| Output         | Positive / Negative                               | Joy, Sadness, Anger, etc.                       | Custom-defined labels                        |
+| Speed          | Fast                                              | Fast                                            | Slower                                       |
+| Ideal Use Case | Quick polarity sentiment check                    | Rich emotional analysis                         | Dynamic emotion detection without retraining |
+
+
 
 These models collectively enable Converser to provide comprehensive insights into speech patterns, sentiment, and emotional tone.
