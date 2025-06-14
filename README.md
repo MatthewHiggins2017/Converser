@@ -32,7 +32,6 @@ Converser_Assess.py --input_file ./Path/To/Audio/File
 | ----------------------------------- | -------------------------------------- | --------------------- | ----------------- | ---------------- | ------------------ |
 | **Average Words Per Minute (WPM)**  | 120–150                                | 100–119 or 151–170    | 90–99 or 171–180  | 80–89 or 181–200 | <80 or >200        |
 | **Mean Pitch Variability (Hz std)** | 30–60                                  | 20–29 or 61–70        | 15–19 or 71–80    | 10–14 or 81–90   | <10 or >90         |
-| **Mean Pause Length (sec)**         | 0.1–0.3                                | 0.05–0.09 or 0.31–0.5 | <0.05 or 0.51–0.7 | 0.71–1.0         | >1.0               |
 | **Filler Word Count**               | 0                                      | 1–2                   | 3–5               | 6–10             | >10                |
 | **Lexical Diversity (TTR)**         | ≥ 0.6                                  | 0.5–0.59              | 0.4–0.49          | 0.3–0.39         | <0.3               |
 | **Readability Grade**               | 7–9 (ideal range for general audience) | 6 or 10               | 5 or 11           | 4 or 12          | ≤3 or ≥13          |
@@ -66,6 +65,9 @@ This package leverages several state-of-the-art transformer models to analyze sp
    - **Function**: Encoded by the Zero_Shot_Analyse_Emotions() function.
 
 
+
+---------------
+
 ## Model Summmary
 
 | Feature        | DistilBERT (Sentiment)                            | DistilRoBERTa (Emotion)                         | BART (Zero-Shot)                             |
@@ -81,3 +83,32 @@ This package leverages several state-of-the-art transformer models to analyze sp
 
 
 These models collectively enable Converser to provide comprehensive insights into speech patterns, sentiment, and emotional tone.
+
+------------
+
+
+## Scoring System In More Detail
+
+
+
+### Readability (Flesch-Kincaid Grade Level)
+
+The Flesch-Kincaid Grade Level is a readability test estimating the years of education required to understand a text. A lower score indicates easier readability.
+
+**Algorithm Formula:**
+$$0.39 \times (\text{words} / \text{sentences}) + 11.8 \times (\text{syllables} / \text{words}) - 15.59$$
+
+
+#### Interpreting Specific Grade Levels
+
+* **0-4 (Beginning to 4th Grade):** Very simple texts, often for young children or extremely basic instructions where clarity is paramount.
+* **5th-6th Grade:** Very easy to read, with shorter sentences and simpler words. Easily understood by average 11-year-olds.
+* **7th-9th Grade:** Fairly easy to read, considered "plain English." This is the sweet spot for content aimed at a broad adult audience.
+* **10th-12th Grade (High School):** Fairly difficult to read. Appropriate for audiences with higher education or complex topics requiring specialized vocabulary.
+* **13+ (College Level and above):** Difficult to very difficult to read. Typically reserved for academic papers, highly specialized technical manuals, or legal documents where precision and comprehensive detail are prioritized over broad accessibility.
+
+
+**Ideal Score for General Population:**
+Aim for a score between **7.0 and 9.0** to ensure your text is easily understood by a broad audience.
+
+------------
