@@ -157,6 +157,8 @@ $$0.39 \times (\text{words} / \text{sentences}) + 11.8 \times (\text{syllables} 
 **Ideal Score for General Population:**
 Aim for a score between **7.0 and 9.0** to ensure your text is easily understood by a broad audience.
 
-##### More to Come!
+------------
+
+### More to Follow Soon!
 
 ------------
