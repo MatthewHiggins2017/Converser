@@ -1,32 +1,12 @@
 """
 
-##############################################
-Scoring System
-##############################################
-
-Window associated metrics:
-    - Word rate per time window.
-    - Average pitch in time window. 
-    - Average gap between words in time window.
-    - Number of pauses. 
-    - Variation in pitch in time window.
-    - Number of filler words. 
-    - Lexical diversity in time window.
-
-Full transcript metrics:
-   - Full Transcript.
-   - Lexical diversity = Repeatability
-   - Readability 
-
-##############################################
-##############################################
-   
 Improvements:
 
+Update the zero shot classifier to a more up to date model 
+as current on is 5 years old. Recommend to update to 
+DeBERTa-v3 zero-shot.
 
-1) Add in fixed tests. 
-2) Add in automatic dependency installation & checking.
-3) Check deployment
+Link on hugging face: https://huggingface.co/MoritzLaurer/deberta-v3-large-zeroshot-v2.0
 
 
 ##############################################
@@ -58,12 +38,12 @@ except LookupError:
 #                              Core Functions                                 #
 ###############################################################################
 
-def convert_m4a_to_wav(input_file, output_file):
+def convert_audio_to_wav(input_file, output_file):
     """
-    Converts an .m4a audio file to a .wav file using the ffmpeg Python library.
+    Converts an audio file (e.g., .m4a, .mp3) to a .wav file using the ffmpeg Python library.
 
     Args:
-        input_file (str): Path to the input .m4a file.
+        input_file (str): Path to the input audio file.
         output_file (str): Path to the output .wav file.
     """
 
@@ -259,9 +239,9 @@ def detect_filler_words(transcript, filler_words=None):
     """
     if filler_words is None:
         filler_words = [
-            "um", "uh", "like", "you know", "so", "well", "hmm", "er", "err", "ah", "okay",
+            "um", "uh", "like", "you know", "well", "hmm", "er", "err", "ah", "okay",
             "actually", "basically", "literally", "right", "I mean", "sort of", "kind of",
-            "you see", "I guess", "you know what I mean", "alright", "anyway", "just",
+            "I guess", "you know what I mean", "alright", "anyway", "just",
             "seriously", "honestly", "no way", "for real", "gotcha", "y'know",
             "I dunno", "meh", "whoa", "like I said", "kinda", "sorta", "uh-huh"
         ]
@@ -320,7 +300,7 @@ def analyze_emotions(transcript):
     return emotion_result
 
 
-def Zero_Shot_Analyse_Emotions(transcript):
+def Zero_Shot_Analyse_Emotions(transcript,candidate_labels):
     # Load the BART large MNLI model
     classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
@@ -490,7 +470,7 @@ def create_html_report(SummaryDf, WindowsMetricDf, ID, output_dir):
             "Mean_Pitch_Std": "30-60 Hz",
             "Mean_Pause": "0.1-0.3 s",
             "Total_Filler_Count": "0-2",
-            "Overall_Lexical_Diversity": "≥0.6",
+            "Overall_Lexical_Diversity": ">0.6",
             "Overall_Readability": "7-9 (Grade Level)",
             "Duration": "N/A",
             "Word Count": "N/A",
@@ -498,7 +478,6 @@ def create_html_report(SummaryDf, WindowsMetricDf, ID, output_dir):
             "Mean_Pause_Std": "N/A",
             "ID": "N/A",
             "Date": "N/A",
-            "User_Label": "N/A"
         }
         return ideal_values.get(metric, "N/A")
     
@@ -1101,23 +1080,28 @@ def create_html_report(SummaryDf, WindowsMetricDf, ID, output_dir):
 
 # Set up argument Parser
 parser = argparse.ArgumentParser(description="Analyze public speaking audio files.")
-parser.add_argument("--input_file", type=str, help="Path to the input .m4a file.", required=True)
-parser.add_argument("--time_window", type=int, default=60, help="Time window size in seconds (default: 60).")
-parser.add_argument("--output_dir",type=str,help="Path to the output directory",default='./')
-parser.add_argument("--user_label",type=str,default='')
+parser.add_argument("-i","--input_file", type=str, help="Path to the input audio file (e.g., .m4a, .mp3).", required=True)
+parser.add_argument("-t","--time_window", type=int, default=60, help="Time window size in seconds (default: 60).")
+parser.add_argument("-o","--output_dir",type=str,help="Path to the output directory",default='./')
+parser.add_argument("--Zero_Shot_Labels",type=str,default='confident,unsure', help="Comma-separated list of zero-shot emotion labels (default: confident,unsure).")
+
 # Parse the arguments
 args = parser.parse_args()
 # Extract ID
-ID = args.input_file.split('/')[-1].replace('.m4a', '')
+ID = os.path.splitext(os.path.basename(args.input_file))[0]
 
 # Create output dir  if it doesnt exist
 if not os.path.isdir(args.output_dir):
     os.makedirs(args.output_dir)
 
+# Parse the zero-shot emotion labels
+candidate_labels = [l.strip().lower() for l in args.Zero_Shot_Labels.split(',')]
+
 
 # 1) Convert to wav file 
-args.output_wav = args.input_file.replace('.m4a', '.wav')
-convert_m4a_to_wav(args.input_file, args.output_wav)
+base, _ = os.path.splitext(args.input_file)
+args.output_wav = base + '.wav'
+convert_audio_to_wav(args.input_file, args.output_wav)
 
 
 # 2) Get the length of the wav file
@@ -1199,7 +1183,7 @@ while True:  # Infinite loop, explicitly break when no words are left
         WindowMetrics['DistilRoBERTa_Dominant_Emotion'] = highest_emotion['label']
         
         # Window-level Zero Shot Emotional Analysis
-        zero_shot_emotion_analysis = Zero_Shot_Analyse_Emotions(TempTranscript)
+        zero_shot_emotion_analysis = Zero_Shot_Analyse_Emotions(TempTranscript,candidate_labels)
         for zse in zero_shot_emotion_analysis:
             WindowMetrics[f'BART_ZeroShot_{zse[0]}'] = zse[1]
             EmotionScore[zse[0]] += zse[1]
@@ -1239,7 +1223,6 @@ EmotionalScoreDf[0] = EmotionalScoreDf[0]/SegmentCount
 SummaryDict = {}
 SummaryDict['ID'] = ID
 SummaryDict['Date'] = pd.to_datetime('today').strftime('%Y-%m-%d')
-SummaryDict['User_Label'] = args.user_label
 SummaryDict['Duration'] = Duration
 SummaryDict['Word Count'] = len(Transcript.split(' '))
 SummaryDict['Average_Words_Per_Minute'] = len(Transcript.split(' ')) / (Duration / 60)
